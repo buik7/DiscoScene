@@ -9,6 +9,9 @@
 #include <fstream>
 #include <string>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 // Import local files
 #include "Shader.h"
 #include "Mesh.h"
@@ -18,6 +21,15 @@ static unsigned int screenshotId = 0;
 const unsigned int WINDOW_WIDTH = 1024;
 const unsigned int WINDOW_HEIGHT = 768;
 const char* WINDOW_NAME = "COMPSCI 3GC3 Assignment 3 -- Khoa Bui \0";
+
+struct SpotLight {
+	glm::vec3 ambient;
+	glm::vec3 diffuse;
+	glm::vec3 attenuation;
+	glm::vec3 position;
+	glm::vec3 direction;
+	float cutoffAngle;    // The cosine value of cutoff angle
+};
 
 // Function declarations
 void dump_framebuffer_to_ppm(std::string prefix, unsigned int width, unsigned int height);
@@ -53,7 +65,7 @@ int main() {
 
 	//Mesh timmy("./asset/timmy.obj", "./asset/timmy.png");
 	Mesh bucket("./asset/bucket.obj", "./asset/bucket.jpg");
-	Mesh floor("./asset/floor.obj", "./asset/floor.jpeg");
+	//Mesh floor("./asset/floor.obj", "./asset/floor.jpeg");
 
 	// enable face culling
 	glEnable(GL_CULL_FACE);
@@ -73,6 +85,44 @@ int main() {
 	glm::vec3 cameraTarget = glm::vec3(0.0f, 80.0f, 0.0f);
 	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
+	// Point light setting
+	glm::vec3 pointLightPosition = glm::vec3(-50.0f, 0.0f, 300.0f);
+	glm::vec3 pointLightAttenuation = glm::vec3(1.0f, 0.007 * 1e-4, 0.0002 * 1e-4);
+	glm::vec3 pointLightAmbient = glm::vec3(0.2f, 0.2f, 0.2f);
+	glm::vec3 pointLightDiffuse = glm::vec3(1.0f, 1.0f, 1.0f);
+
+	//SpotLight spotlights[3];
+
+	// Initialize spotlights (all of them have the same position, ambient, cutoff angle and attenuation)
+	//for (int i = 0; i < 3; i++) {
+	//	spotlights[i].ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	//	spotlights[i].diffuse = glm::vec3(1.0f, 0.0f, 0.0f);
+	//}
+
+	//// first spotlight (spotlight R)
+	//spotlights[0].ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	//spotlights[0].diffuse = glm::vec3(1.0f, 0.0f, 0.0f);
+	//spotlights[0].attenuation = glm::vec3(1.0f, 0.35f, 0.44f);
+	//spotlights[0].position = glm::vec3(0.0f, 200.0f, 0.0f);
+	//spotlights[0].direction = glm::vec3(50.0f, -200.0f, 50.0f);
+	//spotlights[0].cutoffAngle = glm::cos(M_PI / 6.0f);
+
+	//// second spotlight (spotlight G)
+	//spotlights[1].ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	//spotlights[1].diffuse = glm::vec3(0.0f, 1.0f, 0.0f);
+	//spotlights[1].attenuation = glm::vec3(1.0f, 0.35f, 0.44f);
+	//spotlights[1].position = glm::vec3(0.0f, 200.0f, 0.0f);
+	//spotlights[1].direction = glm::vec3(-50.0f, -200.0f, -50.0f);
+	//spotlights[1].cutoffAngle = glm::cos(M_PI / 6.0f);
+
+	//// third spotlight (spotlight B)
+	//spotlights[2].ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	//spotlights[2].diffuse = glm::vec3(0.0f, 0.0f, 1.0f);
+	//spotlights[2].attenuation = glm::vec3(1.0f, 0.35f, 0.44f);
+	//spotlights[2].position = glm::vec3(0.0f, 200.0f, 0.0f);
+	//spotlights[2].direction = glm::vec3(0.0f, -200.0f, 50.0f);
+	//spotlights[2].cutoffAngle = glm::cos(M_PI / 6.0f);
+
 	// Setting up transformation matrices
 	glm::mat4 model = glm::mat4(1.0f);
 	glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
@@ -80,9 +130,19 @@ int main() {
 
 	// activate shader program
 	shaderProgram.use();
+
+	// Pass model, view and projection matrices to vertex shader
 	shaderProgram.setMat4("model", model);
 	shaderProgram.setMat4("view", view);
 	shaderProgram.setMat4("projection", projection);
+
+	// Pass point light properties to shaders
+	shaderProgram.setVec3("pointLight.position", pointLightPosition);
+	shaderProgram.setVec3("pointLight.attenuation", pointLightAttenuation);
+	shaderProgram.setVec3("pointLight.ambient", pointLightAmbient);
+	shaderProgram.setVec3("pointLight.diffuse", pointLightDiffuse);
+
+	float theta = 0.0f;
 
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
@@ -91,7 +151,12 @@ int main() {
 		glClearColor(0.3f, 0.4f, 0.5f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		floor.render();
+		pointLightPosition = glm::vec3(sin(theta) * 150, 100, cos(theta) * 150);
+		theta += 0.05f;
+		shaderProgram.setVec3("pointLight.position", pointLightPosition);
+
+		//timmy.render();
+		//floor.render();
 		bucket.render();
 
 		// Swap buffers and poll IO events
@@ -99,14 +164,14 @@ int main() {
 		glfwPollEvents();
 	}
 
+	//timmy.deleteBuffers();
 	bucket.deleteBuffers();
-	floor.deleteBuffers();
+	//floor.deleteBuffers();
 	shaderProgram.deleteProgram();
 	glfwTerminate();
 	return 0;
 }
 
-// Function definitions
 void dump_framebuffer_to_ppm(std::string prefix, unsigned int width, unsigned int height) {
 	int pixelChannel = 3;
 	int totalPixelSize = pixelChannel * width * height * sizeof(GLubyte);
