@@ -1,10 +1,12 @@
 #version 330 core
 
-struct PointLight {
-    vec3 position;
-    vec3 attenuation; // format : (kc, kl, kq)
-    vec3 ambient;
-    vec3 diffuse;
+struct SpotLight {
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 attenuation;
+	vec3 position;
+	vec3 direction;
+	float cutoffAngle;    // The cosine value of cutoff angle
 };
 
 in vec3 FragPos;
@@ -12,27 +14,36 @@ in vec3 Normal;
 in vec2 TexCoord;
 out vec4 FragColor;
 
-uniform PointLight pointLight;
+uniform SpotLight spotlights[3];
 uniform sampler2D ourTexture;
 
 void main()
 {
     vec3 objectColor = texture(ourTexture, TexCoord).rgb;
-
-    // ambient
-    vec3 ambient = pointLight.ambient * objectColor;
-
-    // diffuse
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(pointLight.position - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = pointLight.diffuse * diff * objectColor;
 
-    // attenuation
-    float dist = length(pointLight.position - FragPos);
-    float attenuation = 1.0 / (pointLight.attenuation.x + pointLight.attenuation.y * dist + pointLight.attenuation.z * dist * dist);
+    vec3 result = vec3(0.0f, 0.0f, 0.0f);
 
-    diffuse *= attenuation;
+    for (int i = 0; i < 3; i++) {
+        // ambient
+        vec3 ambient = spotlights[i].ambient * objectColor;
+        vec3 lightDir = normalize(spotlights[i].position - FragPos);
 
-    FragColor = vec4(ambient + diffuse, 1.0);
+        float theta = dot(lightDir, normalize(-spotlights[i].direction));
+        if (theta > spotlights[i].cutoffAngle) {
+            // diffuse
+            float diff = max(dot(norm, lightDir), 0.0);
+            vec3 diffuse = spotlights[i].diffuse * diff * objectColor;
+
+            // attenuation
+            float dist = length(spotlights[i].position - FragPos);
+            float attenuation = 1.0 / (spotlights[i].attenuation.x + spotlights[i].attenuation.y * dist + spotlights[i].attenuation.z * dist * dist);
+
+            diffuse *= attenuation;
+            result += diffuse;
+        }
+        result += ambient;
+    }
+
+    FragColor = vec4(result, 1.0);
 }
